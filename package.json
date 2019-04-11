@@ -1,5 +1,5 @@
 {
-  "name": "capacitor-fused-location",
+  "name": "@jonoj/capacitor-fused-location",
   "version": "0.0.1",
   "description": "Provides acces to the fused location api by google play services",
   "main": "dist/esm/index.js",
@@ -39,9 +39,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/jonoj-team/capacitor-fused-location"
+    "url": "git+https://github.com/jonoj-team/capacitor-fused-location.git"
   },
   "bugs": {
     "url": "https://github.com/jonoj-team/capacitor-fused-location/issues"
-  }
+  },
+  "homepage": "https://github.com/jonoj-team/capacitor-fused-location#readme"
 }
