@@ -1,6 +1,6 @@
 {
   "name": "@jonoj/capacitor-fused-location",
-  "version": "1.0.0-beta.19.1",
+  "version": "1.0.0-beta.19.2",
   "description": "Provides acces to the fused location api by google play services",
   "main": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
