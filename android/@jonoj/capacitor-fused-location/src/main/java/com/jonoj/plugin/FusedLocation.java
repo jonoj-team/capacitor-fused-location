@@ -1,6 +1,5 @@
 package com.jonoj.plugin;
 
-
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
@@ -17,23 +16,18 @@ import com.patloew.rxlocation.RxLocation;
 import java.util.HashMap;
 import java.util.Map;
 
+import io.reactivex.Observable;
 import io.reactivex.disposables.Disposable;
 
-@NativePlugin(
-        permissions = {
-                Manifest.permission.ACCESS_COARSE_LOCATION,
-                Manifest.permission.ACCESS_FINE_LOCATION
-        },
-        permissionRequestCode = FusedLocation.PERMISSIONS_REQUEST_CODE
-)
+@NativePlugin(permissions = {Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, permissionRequestCode = FusedLocation.PERMISSIONS_REQUEST_CODE)
 public class FusedLocation extends Plugin {
     private static final String TAG = FusedLocation.class.getSimpleName();
 
     public static final int PERMISSIONS_REQUEST_CODE = 9090;
 
-    private Map<String, Disposable> watchingCalls = new HashMap<>();
+    private Map<String, Disposable> callIdToDisposable = new HashMap<>();
+    private Map<String, Observable<Location>> callIdToObservable = new HashMap<>();
     private RxLocation mRxLocation;
-    private Disposable mDisposable;
 
     @PluginMethod()
     public void getCurrentPosition(final PluginCall call) {
@@ -65,10 +59,8 @@ public class FusedLocation extends Plugin {
 
     @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
     public void watchPosition(PluginCall call) {
-        Log.d(TAG, "Requesting to watch position");
         call.save();
         if (!hasRequiredPermissions()) {
-            Log.d(TAG, "Not permitted. Asking permission...");
             saveCall(call);
             pluginRequestAllPermissions();
         } else {
@@ -78,33 +70,28 @@ public class FusedLocation extends Plugin {
 
     @SuppressWarnings("MissingPermission")
     private void startWatch(PluginCall call) {
-        LocationRequest locationRequest;
-        locationRequest = new LocationRequest();
+        LocationRequest locationRequest = new LocationRequest();
         locationRequest.setInterval(7500);
         locationRequest.setFastestInterval(5000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        Disposable disposable = getRxLocation().location().updates(locationRequest).subscribe(location -> {
-            if (location == null) {
-                call.success();
-            } else {
-                call.success(getJSObjectForLocation(location));
-            }
-        });
-        watchingCalls.put(call.getCallbackId(), disposable);
+        callIdToObservable.put(call.getCallbackId(), getRxLocation().location().updates(locationRequest).map(location -> {
+            call.success(getJSObjectForLocation(location));
+            return location;
+        }));
+        callIdToDisposable.put(call.getCallbackId(), callIdToObservable.get(call.getCallbackId()).subscribe());
     }
 
     @SuppressWarnings("MissingPermission")
     @PluginMethod()
     public void clearWatch(PluginCall call) {
-        Log.d(TAG, "Requesting to clear watch");
         String callbackId = call.getString("id");
         if (callbackId != null) {
-            Disposable removed = watchingCalls.remove(callbackId);
+            callIdToObservable.remove(callbackId);
+            Disposable removed = callIdToDisposable.remove(callbackId);
             if (removed != null) {
                 removed.dispose();
             }
         }
-
         call.success();
     }
 
@@ -124,8 +111,6 @@ public class FusedLocation extends Plugin {
             }
         }
 
-        Log.d(TAG, "Continuing saved call: " + savedCall.getMethodName());
-
         if (savedCall.getMethodName().equals("getCurrentPosition")) {
             getLastPosition(savedCall);
         } else if (savedCall.getMethodName().equals("watchPosition")) {
@@ -133,7 +118,39 @@ public class FusedLocation extends Plugin {
         }
     }
 
+    @Override
+    protected void handleOnPause() {
+        for (String key : callIdToDisposable.keySet()) {
+            Disposable disp = callIdToDisposable.remove(key);
+            if (disp != null) {
+                disp.dispose();
+            }
+        }
+    }
+
+    @Override
+    protected void handleOnResume() {
+        for (String key : callIdToObservable.keySet()) {
+            callIdToDisposable.put(key, callIdToObservable.get(key).subscribe());
+        }
+    }
+
+    public void clearAllWatching() {
+        Log.d(TAG, "Clearing all watching");
+        for (String key : callIdToDisposable.keySet()) {
+            Disposable removed = callIdToDisposable.remove(key);
+            if (removed != null) {
+                removed.dispose();
+            }
+        }
+        for (String key : callIdToObservable.keySet()) {
+            callIdToObservable.remove(key);
+        }
+    }
+
     private JSObject getJSObjectForLocation(Location location) {
+        if (location == null) return null;
+
         JSObject ret = new JSObject();
         JSObject coords = new JSObject();
         ret.put("coords", coords);
