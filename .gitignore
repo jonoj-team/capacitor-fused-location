@@ -1,6 +1,6 @@
-dist/
-ios/Plugin/Pods/
-node_modules/
+node_modules
 .DS_Store
-demo/android/app/src/main/assets
+dist
 .idea
+*.tgz
+
