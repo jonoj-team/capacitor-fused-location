@@ -3,3 +3,6 @@
 
 ## Install
 npm i @jonoj/capacitor-fused-location
+
+## Requirements
+JDK 8 
