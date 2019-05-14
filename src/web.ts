@@ -5,8 +5,8 @@ import {
   FusedLocationPosition,
   FusedLocationWatchCallback
 } from './definitions';
-import {PermissionsRequestResult} from "@capacitor/core/dist/esm/definitions";
 import {extend} from "@capacitor/core/dist/esm/util";
+import {PermissionsRequestResult} from "@capacitor/core/dist/esm/definitions";
 
 export class FusedLocationPluginWeb extends WebPlugin implements FusedLocationPlugin {
   constructor() {

@@ -1,7 +1,7 @@
 {
   "name": "@jonoj/capacitor-fused-location",
-  "version": "1.0.0-beta.19.3",
-  "description": "Provides acces to the fused location api by google play services",
+  "version": "1.0.0-beta.24",
+  "description": "Provides access to the fused location api by google play services",
   "main": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
   "scripts": {
@@ -13,7 +13,7 @@
   "author": "Johannes Normann Jensen",
   "license": "MIT",
   "dependencies": {
-    "@capacitor/core": "latest"
+    "@capacitor/core": "^1.0.0-beta.24"
   },
   "devDependencies": {
     "typescript": "^2.6.2"
