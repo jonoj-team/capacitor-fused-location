@@ -12,19 +12,16 @@
   },
   "author": "Johannes Normann Jensen",
   "license": "MIT",
-  "devDependencies": {
-    "@capacitor/android": "^1.1.1",
-    "@capacitor/ios": "^1.1.1",
-    "typescript": "^3.5.3"
+  "dependencies": {
+    "@capacitor/core": "latest"
   },
-  "peerDependencies": {
-    "@capacitor/core": "~1.0.0"
+  "devDependencies": {
+    "typescript": "^3.2.4",
+    "@capacitor/android": "latest"
   },
   "files": [
     "dist/",
-    "ios/",
-    "android/",
-    "CapacitorFusedLocation.podspec"
+    "android/"
   ],
   "keywords": [
     "capacitor",
@@ -33,9 +30,6 @@
     "fusedlocation"
   ],
   "capacitor": {
-    "ios": {
-      "src": "ios"
-    },
     "android": {
       "src": "android"
     }
