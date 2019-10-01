@@ -10,7 +10,6 @@
     "watch": "tsc --watch",
     "prepublishOnly": "npm run build",
     "prepare": "npm run build"
-
   },
   "author": "Johannes Normann Jensen",
   "license": "MIT",
@@ -18,8 +17,8 @@
     "@capacitor/core": "latest"
   },
   "devDependencies": {
-    "typescript": "^3.2.4",
-    "@capacitor/android": "latest"
+    "@capacitor/android": "^1.2.1",
+    "typescript": "^3.6.3"
   },
   "files": [
     "dist/",
