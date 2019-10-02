@@ -3,6 +3,7 @@ package com.jonoj.plugin;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.os.Build;
 import android.util.Log;
 
 import com.getcapacitor.JSObject;
@@ -10,6 +11,7 @@ import com.getcapacitor.NativePlugin;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PluginRequestCodes;
 import com.google.android.gms.location.LocationRequest;
 import com.patloew.rxlocation.RxLocation;
 
@@ -19,42 +21,66 @@ import java.util.Map;
 import io.reactivex.Observable;
 import io.reactivex.disposables.Disposable;
 
-@NativePlugin(permissions = {Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, permissionRequestCode = FusedLocation.PERMISSIONS_REQUEST_CODE)
+/**
+ * Geolocation plugin that uses the fused location service instead of the native API.
+ * <p>
+ * Getting a location under android is quite difficult. The standard API implemented now in capacitor returns the GPS provider
+ * which results in never getting a position indoors. This is not the case under iOS. A better way under Android is the
+ * Fused Location Provider which already handles that.
+ * <p>
+ * See docs here: https://developers.google.com/android/reference/com/google/android/gms/location/FusedLocationProviderClient
+ * <p>
+ * This plugin currently relies on https://github.com/patloew/RxLocation
+ */
+
+
+@NativePlugin(
+        permissions = {
+                Manifest.permission.ACCESS_COARSE_LOCATION,
+                Manifest.permission.ACCESS_FINE_LOCATION
+        },
+        permissionRequestCode = PluginRequestCodes.GEOLOCATION_REQUEST_PERMISSIONS
+)
 public class FusedLocation extends Plugin {
-    private static final String TAG = FusedLocation.class.getSimpleName();
-
-    public static final int PERMISSIONS_REQUEST_CODE = 9090;
-
     private Map<String, Disposable> callIdToDisposable = new HashMap<>();
     private Map<String, Observable<Location>> callIdToObservable = new HashMap<>();
     private RxLocation mRxLocation;
 
     @PluginMethod()
-    public void getCurrentPosition(final PluginCall call) {
-        Log.d(TAG, "Requesting current position");
-
-        call.save();
+    public void getCurrentPosition(PluginCall call) {
+        Log.d(getLogTag(), "Requesting current position");
         if (!hasRequiredPermissions()) {
-            Log.d(TAG, "Not permitted. Asking permission...");
+            Log.d(getLogTag(), "Not permitted. Asking permission...");
             saveCall(call);
             pluginRequestAllPermissions();
         } else {
-            getLastPosition(call);
+            sendLocation(call);
         }
-
     }
 
-    @SuppressWarnings("MissingPermission")
-    private void getLastPosition(final PluginCall call) {
+    private void onNewLocation(PluginCall call, Location location) {
+        if (location == null) {
+            Log.d(getLogTag(), "Last position is null");
+            call.error("location unavailable");
+        } else {
+            Log.d(getLogTag(), "Last position is not null");
+            call.success(getJSObjectForLocation(location));
+        }
+    }
+
+    private void onSubscribeError(PluginCall call, Throwable throwable) {
+        Log.e(getLogTag(), "error subscribing to location" + throwable.getMessage());
+        call.error("subscribe throws " + throwable.getMessage());
+    }
+
+    private void sendLocation(PluginCall call) {
         getRxLocation().location().lastLocation().subscribe(location -> {
-            if (location == null) {
-                Log.d(TAG, "Last position is null");
-                call.success();
-            } else {
-                Log.d(TAG, "Last position is not null");
-                call.success(getJSObjectForLocation(location));
-            }
-        });
+                    onNewLocation(call, location);
+                },
+                throwable -> {
+                    onSubscribeError(call, throwable);
+                }
+        );
     }
 
     @PluginMethod(returnType = PluginMethod.RETURN_CALLBACK)
@@ -74,16 +100,20 @@ public class FusedLocation extends Plugin {
         locationRequest.setInterval(7500);
         locationRequest.setFastestInterval(5000);
         locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        callIdToObservable.put(call.getCallbackId(), getRxLocation().location().updates(locationRequest).map(location -> {
-            call.success(getJSObjectForLocation(location));
-            return location;
-        }));
+
+        callIdToObservable.put(call.getCallbackId(),
+                getRxLocation().location().updates(locationRequest)
+                        .doOnNext(location -> {
+                            onNewLocation(call, location);
+                        }).onErrorResumeNext(Observable.empty()));
+
         callIdToDisposable.put(call.getCallbackId(), callIdToObservable.get(call.getCallbackId()).subscribe());
     }
 
     @SuppressWarnings("MissingPermission")
     @PluginMethod()
     public void clearWatch(PluginCall call) {
+        Log.d(getLogTag(), "clearWatch");
         String callbackId = call.getString("id");
         if (callbackId != null) {
             callIdToObservable.remove(callbackId);
@@ -112,52 +142,27 @@ public class FusedLocation extends Plugin {
         }
 
         if (savedCall.getMethodName().equals("getCurrentPosition")) {
-            getLastPosition(savedCall);
+            sendLocation(savedCall);
         } else if (savedCall.getMethodName().equals("watchPosition")) {
             startWatch(savedCall);
-        }
-    }
-
-    @Override
-    protected void handleOnPause() {
-        for (String key : callIdToDisposable.keySet()) {
-            Disposable disp = callIdToDisposable.remove(key);
-            if (disp != null) {
-                disp.dispose();
-            }
-        }
-    }
-
-    @Override
-    protected void handleOnResume() {
-        for (String key : callIdToObservable.keySet()) {
-            callIdToDisposable.put(key, callIdToObservable.get(key).subscribe());
-        }
-    }
-
-    public void clearAllWatching() {
-        Log.d(TAG, "Clearing all watching");
-        for (String key : callIdToDisposable.keySet()) {
-            Disposable removed = callIdToDisposable.remove(key);
-            if (removed != null) {
-                removed.dispose();
-            }
-        }
-        for (String key : callIdToObservable.keySet()) {
-            callIdToObservable.remove(key);
+        } else {
+            savedCall.resolve();
+            savedCall.release(bridge);
         }
     }
 
     private JSObject getJSObjectForLocation(Location location) {
-        if (location == null) return null;
-
         JSObject ret = new JSObject();
         JSObject coords = new JSObject();
         ret.put("coords", coords);
+        ret.put("timestamp", location.getTime());
         coords.put("latitude", location.getLatitude());
         coords.put("longitude", location.getLongitude());
         coords.put("accuracy", location.getAccuracy());
         coords.put("altitude", location.getAltitude());
+        if (Build.VERSION.SDK_INT >= 26) {
+            coords.put("altitudeAccuracy", location.getVerticalAccuracyMeters());
+        }
         coords.put("speed", location.getSpeed());
         coords.put("heading", location.getBearing());
         return ret;
