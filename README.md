@@ -1,3 +1,26 @@
+<br>
+<br>
+<br>
+<br>
+
+---
+
+# DISCONTINUED
+
+@jonoj/capacitor-fused-location is abandoned as a project since Capacitor uses FusedLocationProvider as default on android.
+
+Anyone using this plugin should revert to using the default Capacitor geolocation implementation.
+
+---
+
+
+<br>
+<br>
+<br>
+<br>
+<br>
+<br>
+
 # capacitor-fused-location
 
 <p align="center">
